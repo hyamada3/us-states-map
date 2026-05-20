@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アメリカ合衆国 50州地図</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a2535;
+      color: #d0dce8;
+      font-family: 'Segoe UI', 'Meiryo', 'Yu Gothic', sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #header {
+      background: #1e3050;
+      padding: 9px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 600;
+      border-bottom: 1px solid #2d4565;
+      flex-shrink: 0;
+      letter-spacing: 0.5px;
+    }
+
+    .content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #map-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #141e2e;
+    }
+
+    #map-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .state {
+      cursor: pointer;
+      stroke: #141e2e;
+      stroke-width: 0.8;
+      transition: filter 0.15s ease;
+    }
+
+    .state:hover {
+      filter: brightness(1.4) drop-shadow(0 0 4px rgba(255,255,255,0.25));
+    }
+
+    .state.selected {
+      stroke: #ffffff;
+      stroke-width: 2;
+      filter: brightness(1.15);
+    }
+
+    .state-abbr {
+      font-size: 9.5px;
+      fill: #ffffff;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      paint-order: stroke fill;
+      stroke: rgba(0,0,0,0.7);
+      stroke-width: 3px;
+      stroke-linejoin: round;
+    }
+
+    .state-abbr.visible { opacity: 1; }
+
+    #sidebar {
+      width: 210px;
+      background: #1e3050;
+      border-left: 1px solid #2d4565;
+      display: flex;
+      flex-direction: column;
+      padding: 18px 16px;
+      gap: 22px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .sidebar-section h3 {
+      font-size: 11px;
+      color: #6a90b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #2d4565;
+      padding-bottom: 6px;
+    }
+
+    #state-hint {
+      font-size: 13px;
+      color: #445570;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #state-detail-content { display: none; }
+
+    #state-abbr-display {
+      font-size: 32px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+      letter-spacing: 1px;
+    }
+
+    #state-fullname {
+      font-size: 14px;
+      color: #c0d4e8;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    #state-fullname-ja {
+      font-size: 12px;
+      color: #8aaccc;
+      margin-top: 3px;
+    }
+
+    #state-region-label {
+      font-size: 11px;
+      color: #7a9abf;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    #state-region-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 12px;
+      color: #8aaac8;
+      margin-bottom: 8px;
+    }
+
+    .legend-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    #info-msg {
+      font-size: 11px;
+      color: #3a5070;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+
+    #reset-btn {
+      margin-top: auto;
+      background: #2a4060;
+      border: 1px solid #3a5575;
+      color: #90b8d8;
+      padding: 9px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    #reset-btn:hover {
+      background: #3a5575;
+      color: #c0d8f0;
+    }
+
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #6a90b8;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #2d4565;
+      border-top-color: #5b8fc0;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error-msg {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #d08888;
+      font-size: 13px;
+      text-align: center;
+      line-height: 1.7;
+      background: #1e3050;
+      padding: 20px 28px;
+      border-radius: 8px;
+      border: 1px solid #3a5565;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <span>🇺🇸</span>
+    <span>アメリカ合衆国 50州地図</span>
+  </div>
+
+  <div class="content">
+    <div id="map-container">
+      <div id="loading">
+        <div class="spinner"></div>
+        地図データを読み込んでいます...
+      </div>
+      <div id="error-msg">
+        地図データの読み込みに失敗しました。<br>
+        インターネット接続を確認してください。
+      </div>
+      <svg id="map-svg">
+        <defs>
+          <filter id="drop-shadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="rgba(255,255,255,0.3)"/>
+          </filter>
+        </defs>
+      </svg>
+    </div>
+
+    <div id="sidebar">
+      <div class="sidebar-section">
+        <h3>州の詳細</h3>
+        <div id="state-hint">← 州をクリック</div>
+        <div id="state-detail-content">
+          <div id="state-abbr-display"></div>
+          <div id="state-fullname"></div>
+          <div id="state-fullname-ja"></div>
+          <div id="state-region-label">
+            <div id="state-region-dot"></div>
+            <span id="state-region-text"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>地域の凡例</h3>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#4e85b8"></div>
+          <span>北東部</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#c09535"></div>
+          <span>南部</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#4e9e60"></div>
+          <span>中西部</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#8060b8"></div>
+          <span>西部</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div id="info-msg">州をクリックすると州の略称が地図上に表示されます。<br>再度クリックで非表示。</div>
+      </div>
+
+      <button id="reset-btn" onclick="resetMap()">すべてリセット</button>
+    </div>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+  <script>
+    // FIPS code → state abbreviation
+    const fipsToAbbr = {
+      '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA',
+      '08':'CO','09':'CT','10':'DE','12':'FL','13':'GA',
+      '15':'HI','16':'ID','17':'IL','18':'IN','19':'IA',
+      '20':'KS','21':'KY','22':'LA','23':'ME','24':'MD',
+      '25':'MA','26':'MI','27':'MN','28':'MS','29':'MO',
+      '30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ',
+      '35':'NM','36':'NY','37':'NC','38':'ND','39':'OH',
+      '40':'OK','41':'OR','42':'PA','44':'RI','45':'SC',
+      '46':'SD','47':'TN','48':'TX','49':'UT','50':'VT',
+      '51':'VA','53':'WA','54':'WV','55':'WI','56':'WY'
+    };
+
+    const stateNames = {
+      'AL':'Alabama','AK':'Alaska','AZ':'Arizona','AR':'Arkansas',
+      'CA':'California','CO':'Colorado','CT':'Connecticut','DE':'Delaware',
+      'FL':'Florida','GA':'Georgia','HI':'Hawaii','ID':'Idaho',
+      'IL':'Illinois','IN':'Indiana','IA':'Iowa','KS':'Kansas',
+      'KY':'Kentucky','LA':'Louisiana','ME':'Maine','MD':'Maryland',
+      'MA':'Massachusetts','MI':'Michigan','MN':'Minnesota','MS':'Mississippi',
+      'MO':'Missouri','MT':'Montana','NE':'Nebraska','NV':'Nevada',
+      'NH':'New Hampshire','NJ':'New Jersey','NM':'New Mexico','NY':'New York',
+      'NC':'North Carolina','ND':'North Dakota','OH':'Ohio','OK':'Oklahoma',
+      'OR':'Oregon','PA':'Pennsylvania','RI':'Rhode Island','SC':'South Carolina',
+      'SD':'South Dakota','TN':'Tennessee','TX':'Texas','UT':'Utah',
+      'VT':'Vermont','VA':'Virginia','WA':'Washington','WV':'West Virginia',
+      'WI':'Wisconsin','WY':'Wyoming'
+    };
+
+    const stateNamesJa = {
+      'AL':'アラバマ州','AK':'アラスカ州','AZ':'アリゾナ州','AR':'アーカンソー州',
+      'CA':'カリフォルニア州','CO':'コロラド州','CT':'コネチカット州','DE':'デラウェア州',
+      'FL':'フロリダ州','GA':'ジョージア州','HI':'ハワイ州','ID':'アイダホ州',
+      'IL':'イリノイ州','IN':'インディアナ州','IA':'アイオワ州','KS':'カンザス州',
+      'KY':'ケンタッキー州','LA':'ルイジアナ州','ME':'メイン州','MD':'メリーランド州',
+      'MA':'マサチューセッツ州','MI':'ミシガン州','MN':'ミネソタ州','MS':'ミシシッピ州',
+      'MO':'ミズーリ州','MT':'モンタナ州','NE':'ネブラスカ州','NV':'ネバダ州',
+      'NH':'ニューハンプシャー州','NJ':'ニュージャージー州','NM':'ニューメキシコ州','NY':'ニューヨーク州',
+      'NC':'ノースカロライナ州','ND':'ノースダコタ州','OH':'オハイオ州','OK':'オクラホマ州',
+      'OR':'オレゴン州','PA':'ペンシルベニア州','RI':'ロードアイランド州','SC':'サウスカロライナ州',
+      'SD':'サウスダコタ州','TN':'テネシー州','TX':'テキサス州','UT':'ユタ州',
+      'VT':'バーモント州','VA':'バージニア州','WA':'ワシントン州','WV':'ウェストバージニア州',
+      'WI':'ウィスコンシン州','WY':'ワイオミング州'
+    };
+
+    const regionColors = {
+      'Northeast': '#4e85b8',
+      'South':     '#c09535',
+      'Midwest':   '#4e9e60',
+      'West':      '#8060b8'
+    };
+
+    const regionNamesJa = {
+      'Northeast': '北東部',
+      'South':     '南部',
+      'Midwest':   '中西部',
+      'West':      '西部'
+    };
+
+    const stateRegion = {};
+    (() => {
+      const map = {
+        'Northeast': ['CT','ME','MA','NH','RI','VT','NJ','NY','PA','DE','MD'],
+        'South':     ['AL','AR','FL','GA','KY','LA','MS','NC','SC','TN','VA','WV','TX','OK'],
+        'Midwest':   ['IL','IN','IA','KS','MI','MN','MO','NE','ND','OH','SD','WI'],
+        'West':      ['AK','AZ','CA','CO','HI','ID','MT','NV','NM','OR','UT','WA','WY']
+      };
+      Object.entries(map).forEach(([r, ss]) => ss.forEach(s => stateRegion[s] = r));
+    })();
+
+    const revealedStates = new Set();
+    let statesData = null;
+
+    const svg = d3.select('#map-svg');
+    const statesG = svg.append('g').attr('id', 'states-g');
+    const labelsG = svg.append('g').attr('id', 'labels-g');
+
+    const projection = d3.geoAlbersUsa();
+    const pathGen = d3.geoPath().projection(projection);
+
+    function getContainerSize() {
+      const el = document.getElementById('map-container');
+      return { w: el.clientWidth, h: el.clientHeight };
+    }
+
+    function updateProjection() {
+      const { w, h } = getContainerSize();
+      const scale = Math.min(w * 1.22, h * 2.15);
+      projection.translate([w / 2, h / 2]).scale(scale);
+      svg.attr('width', w).attr('height', h);
+    }
+
+    function renderMap() {
+      if (!statesData) return;
+      updateProjection();
+      statesG.selectAll('path').attr('d', pathGen);
+      statesData.forEach(d => {
+        const abbr = fipsToAbbr[String(d.id).padStart(2, '0')];
+        if (!abbr) return;
+        const c = pathGen.centroid(d);
+        if (!isNaN(c[0])) {
+          labelsG.select(`#label-${abbr}`).attr('x', c[0]).attr('y', c[1]);
+        }
+      });
+    }
+
+    function onStateClick(event, d) {
+      const abbr = fipsToAbbr[String(d.id).padStart(2, '0')];
+      if (!abbr) return;
+
+      if (revealedStates.has(abbr)) {
+        revealedStates.delete(abbr);
+        labelsG.select(`#label-${abbr}`).classed('visible', false);
+        d3.select(this).classed('selected', false);
+      } else {
+        revealedStates.add(abbr);
+        labelsG.select(`#label-${abbr}`).classed('visible', true);
+        d3.select(this).classed('selected', true);
+      }
+
+      showSidebarDetail(abbr);
+    }
+
+    function showSidebarDetail(abbr) {
+      const region = stateRegion[abbr] || '';
+      const color  = regionColors[region] || '#888';
+
+      document.getElementById('state-hint').style.display = 'none';
+      document.getElementById('state-detail-content').style.display = 'block';
+      document.getElementById('state-abbr-display').textContent  = abbr;
+      document.getElementById('state-fullname').textContent       = stateNames[abbr] || '';
+      document.getElementById('state-fullname-ja').textContent    = stateNamesJa[abbr] || '';
+      document.getElementById('state-region-dot').style.background = color;
+      document.getElementById('state-region-text').textContent   = regionNamesJa[region] || '';
+    }
+
+    function resetMap() {
+      revealedStates.clear();
+      labelsG.selectAll('.state-abbr').classed('visible', false);
+      statesG.selectAll('.state').classed('selected', false);
+      document.getElementById('state-hint').style.display = 'flex';
+      document.getElementById('state-detail-content').style.display = 'none';
+    }
+
+    // Load TopoJSON from CDN
+    d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then(us => {
+      document.getElementById('loading').style.display = 'none';
+      statesData = topojson.feature(us, us.objects.states).features;
+      updateProjection();
+
+      statesG.selectAll('path')
+        .data(statesData)
+        .join('path')
+        .attr('class', 'state')
+        .attr('d', pathGen)
+        .attr('fill', d => {
+          const abbr = fipsToAbbr[String(d.id).padStart(2, '0')];
+          return regionColors[stateRegion[abbr]] || '#555e6a';
+        })
+        .on('click', onStateClick);
+
+      statesData.forEach(d => {
+        const abbr = fipsToAbbr[String(d.id).padStart(2, '0')];
+        if (!abbr) return;
+        const c = pathGen.centroid(d);
+        if (isNaN(c[0]) || isNaN(c[1])) return;
+        labelsG.append('text')
+          .attr('id', `label-${abbr}`)
+          .attr('class', 'state-abbr')
+          .attr('x', c[0])
+          .attr('y', c[1])
+          .text(abbr);
+      });
+
+    }).catch(() => {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error-msg').style.display = 'block';
+    });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(renderMap, 80);
+    });
+  </script>
+</body>
+</html>
