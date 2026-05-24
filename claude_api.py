@@ -9,7 +9,7 @@ SYSTEM_PROMPT = """あなたは親切なアシスタントです。
 def simple_chat(user_message: str) -> str:
     """シンプルな1回のメッセージ送受信"""
     response = client.messages.create(
-        model="claude-opus-4-7",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         system=[
             {
@@ -27,7 +27,7 @@ def streaming_chat(user_message: str) -> str:
     """ストリーミングでリアルタイムに出力"""
     print("アシスタント: ", end="", flush=True)
     with client.messages.stream(
-        model="claude-opus-4-7",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         system=[
             {
@@ -60,7 +60,7 @@ def multi_turn_chat():
         messages.append({"role": "user", "content": user_input})
 
         response = client.messages.create(
-            model="claude-opus-4-7",
+            model="claude-sonnet-4-6",
             max_tokens=1024,
             system=[
                 {
