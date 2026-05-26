@@ -42,23 +42,37 @@ else
 fi
 
 # API 呼び出し
-RESPONSE=$(curl -s -X POST "https://api.anthropic.com/v1/messages" \
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.anthropic.com/v1/messages" \
   -H "x-api-key: $API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
   -d "$PAYLOAD")
 
-# エラーチェック
-if echo "$RESPONSE" | grep -q '"error"'; then
-  ERROR_MSG=$(echo "$RESPONSE" | grep -o '"message":"[^"]*"' | head -1 | sed 's/"message":"//;s/"//')
-  echo "APIエラー: $ERROR_MSG" >&2
+# HTTPステータスコードとボディを分離
+HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+BODY=$(echo "$RESPONSE" | sed '$d')
+
+# ネットワークエラー確認
+if [[ -z "$BODY" ]]; then
+  echo "エラー: レスポンスが空です。ネットワーク接続を確認してください。" >&2
+  exit 1
+fi
+
+# HTTPエラー確認（2xx以外はエラー）
+if [[ "$HTTP_STATUS" -lt 200 || "$HTTP_STATUS" -ge 300 ]]; then
+  if command -v jq &>/dev/null; then
+    ERROR_MSG=$(echo "$BODY" | jq -r '.error.message // "不明なエラー"')
+  else
+    ERROR_MSG=$(echo "$BODY" | grep -o '"message":"[^"]*"' | head -1 | sed 's/"message":"//;s/"//')
+  fi
+  echo "APIエラー (HTTP $HTTP_STATUS): $ERROR_MSG" >&2
   exit 1
 fi
 
 # レスポンスからテキストを取り出す
 if command -v jq &>/dev/null; then
-  echo "$RESPONSE" | jq -r '.content[0].text'
+  echo "$BODY" | jq -r '.content[0].text'
 else
   # jqがない場合は簡易パース
-  echo "$RESPONSE" | grep -o '"text":"[^"]*"' | head -1 | sed 's/"text":"//;s/"$//' | sed 's/\\n/\n/g'
+  echo "$BODY" | grep -o '"text":"[^"]*"' | head -1 | sed 's/"text":"//;s/"$//' | sed 's/\\n/\n/g'
 fi
